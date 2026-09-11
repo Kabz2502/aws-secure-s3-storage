@@ -4,6 +4,15 @@ A hands-on AWS project demonstrating secure cloud storage practices: an S3 bucke
 locked down with a custom least-privilege IAM policy, and CloudTrail enabled for
 account-level audit logging.
 
+## Architecture
+
+![Architecture diagram](aws-project-screenshots/00-architecture-diagram.svg)
+
+An IAM user sits in a group with a custom policy scoped to one S3 bucket only.
+The policy allows read, write and list actions but deliberately excludes delete.
+CloudTrail logs all account-level activity for audit purposes, and the root
+account is secured separately with MFA.
+
 ## What this project demonstrates
 
 - Creating an S3 bucket with public access blocked by default
@@ -12,21 +21,8 @@ account-level audit logging.
 - Applying the principle of **least privilege**: an IAM user/group can only do what
   it's explicitly allowed to do, nothing more
 - Enabling **CloudTrail** to log account activity for audit purposes
-- Verifying the security setup actually works by testing an unauthorised action
-  and confirming it's blocked
-
-## Architecture
-
-1. **S3 bucket** (`kabilan-secure-storage-2026`) — general purpose bucket, all public
-   access blocked, server-side encryption (SSE-S3) enabled by default.
-2. **IAM group** (`s3-project-users`) with a **custom policy** attached, scoped to
-   this one bucket only:
-   - `s3:GetObject` — allowed
-   - `s3:PutObject` — allowed
-   - `s3:ListBucket` — allowed
-   - `s3:DeleteObject` — **not granted**
-3. **CloudTrail** trail (`s3-project-audit-trail`) — multi-region, logging
-   management events (account-level actions like bucket/policy/trail creation).
+- Verifying the security setup by testing an unauthorised action and confirming
+  it's blocked
 
 ## Why these decisions
 
@@ -48,6 +44,18 @@ account-level audit logging.
   whole AWS account, so securing it with MFA was one of the first steps, before
   any resources were created.
 
+## How to reproduce the least-privilege test
+
+1. Create an S3 bucket with all public access blocked.
+2. Write a custom IAM policy scoped to that bucket only, granting `s3:GetObject`,
+   `s3:PutObject` and `s3:ListBucket` — leave `s3:DeleteObject` out.
+3. Attach the policy to an IAM group, and add an IAM user to that group.
+4. Sign in to the AWS console as the IAM user (not root).
+5. Upload and open a file in the bucket — both should succeed.
+6. Select the file and attempt to delete it.
+7. Confirm the deletion fails with **Access Denied** — this proves the policy's
+   restrictions are enforced by AWS, not just written on paper.
+
 ## Evidence: the policy actually works
 
 To confirm the least-privilege policy was enforced (not just written), I logged
@@ -61,10 +69,16 @@ The IAM user could view and upload files as intended, but was correctly blocked
 from deleting them — proving the policy's restrictions are actually enforced by
 AWS, not just theoretical.
 
+CloudTrail was also confirmed active and logging account-level activity
+throughout the setup:
+
+![CloudTrail logging active](aws-project-screenshots/04-cloudtrail-logging-active.png)
+
 ## Screenshots
 
 | Step | Screenshot |
 |---|---|
+| Architecture diagram | `00-architecture-diagram.svg` |
 | S3 bucket created with public access blocked | `01-bucket-created.png` |
 | Custom least-privilege IAM policy created | `02-iam-policy-created.png` |
 | Policy attached to group (broad policy removed) | `03-policy-attached-to-group.png` |
